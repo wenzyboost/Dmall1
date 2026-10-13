@@ -13,10 +13,10 @@ const client = new Client({
 const commands = [
   new SlashCommandBuilder()
     .setName('dmall')
-    .setDescription('Envoie un DM à tous les membres du serveur')
+    .setDescription('Envoie un DM à tous les membres — utilise {user} pour le pseudo')
     .addStringOption(opt =>
       opt.setName('message')
-        .setDescription('Le message à envoyer')
+        .setDescription('Le message. {user} = remplacé par le pseudo du membre automatiquement')
         .setRequired(true)
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
@@ -42,7 +42,7 @@ client.on('interactionCreate', async (interaction) => {
     return interaction.reply({ content: 'Admins only.', ephemeral: true });
   }
 
-  const message = interaction.options.getString('message');
+  const template = interaction.options.getString('message');
   await interaction.deferReply({ ephemeral: true });
 
   const guild = interaction.guild;
@@ -53,13 +53,17 @@ client.on('interactionCreate', async (interaction) => {
   let failed = 0;
 
   for (const [, member] of members) {
+    // Remplace {user} par le vrai pseudo du membre
+    const personalised = template.replaceAll('{user}', member.displayName);
+
     try {
-      await member.send(message);
+      await member.send(personalised);
       success++;
     } catch {
       failed++;
     }
-    await new Promise(r => setTimeout(r, 1000));
+
+    await new Promise(r => setTimeout(r, 1200)); // anti rate-limit
 
     if ((success + failed) % 10 === 0) {
       await interaction.editReply({
@@ -69,7 +73,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   await interaction.editReply({
-    content: `✅ **Terminé !**\n📨 Envoyés : **${success}**\n❌ Échoués : **${failed}**\n👥 Total : **${members.size}**`
+    content: `✅ **Terminé !**\n📨 Envoyés : **${success}**\n❌ Échoués (DM fermés) : **${failed}**\n👥 Total : **${members.size}**`
   });
 });
 
